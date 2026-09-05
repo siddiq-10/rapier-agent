@@ -81,17 +81,27 @@ TOOL_FUNCTIONS = {
 }
 
 
-def run_agent(user_query: str, max_steps: int = 8):
+def run_agent(user_query: str, max_steps: int = 10):
     messages = [
-        {
-            "role": "system",
-            "content": """You are Rapier, a Market Intelligence Agent focused on payments and fintech.
-Priority companies: Cashfree Payments, PayU India, Instamojo, CCAvenue, Stripe, PayPal, Adyen.
-Use tools when needed to gather information, then give a clear final answer with Key Updates, Impact, and Recommended Actions."""
-        },
-        {"role": "user", "content": user_query}
-    ]
+    {
+        "role": "system",
+        "content": """You are Rapier, a Market Intelligence Agent for payments and fintech.
 
+Priority companies: Razorpay, Cashfree Payments, PayU India, Instamojo, CCAvenue, Stripe, PayPal, Adyen.
+
+Rules:
+- Use tools only when necessary.
+- After collecting enough information (usually 2-4 tool calls), you MUST give the final answer.
+- Do not keep calling tools endlessly.
+- Your final response must be a clear structured report with:
+  1. Key Updates
+  2. Competitive Analysis
+  3. Impact
+  4. Recommended Actions
+"""
+    },
+    {"role": "user", "content": user_query}
+]
     for step in range(max_steps):
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
@@ -140,5 +150,19 @@ Use tools when needed to gather information, then give a clear final answer with
         else:
             # No tool call → this is the final answer
             return message.content
+        
+        # Force a final answer if max steps reached
+    messages.append({
+        "role": "user",
+        "content": "You have enough information. Give the Final Answer now in a structured format."
+    })
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=messages,
+        temperature=0.3,
+        max_tokens=2048
+    )
+    return response.choices[0].message.content
 
     return "Reached maximum steps."
